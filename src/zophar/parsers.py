@@ -80,7 +80,7 @@ def _item_from_link[T: ChildItem](
     except ParseError:
         return
 
-    if name and len(x := url.raw_parts) == 2:
+    if name and len(x := url.parts) == 2:
         return cls(id=x[1], name=name, parent_id=x[0])
 
 

@@ -44,7 +44,7 @@ class ZopharMusicBrowser:
         return self.close()
 
     async def _get(self, url_or_path: URL | str) -> str:
-        url = BASE_URL.join(URL(url_or_path, encoded=True))
+        url = BASE_URL.join(URL(url_or_path))
         async with self._cli.get(url) as x:
             _LOGGER.debug("GET %s", x.url)
             return await x.text()
@@ -100,7 +100,6 @@ class ZopharMusicBrowser:
             url = URL.build(
                 path=url,
                 query_string=f"page={page}",
-                encoded=True,
             )
 
         return parse_gamelistpage(await self._get(url))
@@ -239,12 +238,12 @@ class ZopharMusicBrowser:
     async def random_game(self) -> GameInfo:
         """Gets random game"""
 
-        url = BASE_URL.with_path("random-music", encoded=True)
+        url = BASE_URL.with_path("random-music")
 
         async with self._cli.get(url, allow_redirects=False) as x:
             assert x.status == 302
             new_location = x.headers["location"]
 
-        path = "/".join(URL(new_location).raw_parts[-2:])
+        path = "/".join(URL(new_location).parts[-2:])
 
         return await self.game_info(path)
