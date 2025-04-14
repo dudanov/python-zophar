@@ -240,23 +240,8 @@ class ZopharMusicBrowser:
 
         async with self._cli.get(url, allow_redirects=False) as x:
             assert x.status == 302
-            url = URL(x.headers["location"])
+            parent_id, id = x.headers["location"].rsplit("/", 2)[-2:]
 
-        path = "/".join(url.parts[-2:])
-
-        if game := self._games_cache.get(path):
-            return game
-
-        # Site has a bug on 2025/04/14: first redirect have `HTTP` scheme.
-        if url.scheme == "https":
-            _LOGGER.info("Redirection bug fixed. Workaround may be removed.")
-        else:
-            url = url.with_scheme("https")
-
-        async with self._cli.get(url) as x:
-            html = await x.text()
-
-        game = parse_gamepage(html, path)
-        self._games_cache[path] = game
-
-        return game
+        return await self.game_info(
+            GameEntry(id=id, parent_id=parent_id, name=id)
+        )
