@@ -215,19 +215,15 @@ class ZopharMusicBrowser:
             Game entries list.
         """
 
-        if platform is None:
-            id = "0"
+        query, id = {"search": context}, "0"
 
-        elif (id := self._platforms.get(platform)) is None:
+        if platform and (id := self._platforms.get(platform)) is None:
             raise ValueError("Unknown platform: '%s'", platform)
 
-        url = URL.build(
-            path="search",
-            query={
-                "search": context,
-                "search_consoleid": id,
-            },
-        )
+        if id != "0":
+            query["search_consoleid"] = id
+
+        url = URL.build(path="search", query=query)
 
         result, pages = parse_gamelistpage(await self._get(url))
         assert pages == 1
