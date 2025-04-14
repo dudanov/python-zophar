@@ -164,24 +164,27 @@ class ZopharMusicBrowser:
 
         return parse_infopage(await self._get(item.path))
 
-    async def game_info(self, entry: GameEntry) -> GameInfo:
+    async def game_info(self, entry_or_path: GameEntry | str) -> GameInfo:
         """
         Scrapes game page.
 
         Args:
-            entry: Game entry from game list.
+            entry: Game entry from game list or relative path.
 
         Returns:
             Full game information with soundtracks.
         """
 
-        if x := self._games_cache.get(path := entry.path):
-            return x
+        if isinstance(entry_or_path, GameEntry):
+            entry_or_path = entry_or_path.path
 
-        info = parse_gamepage(await self._get(path), entry)
-        self._games_cache[path] = info
+        if game := self._games_cache.get(path := entry_or_path):
+            return game
 
-        return info
+        game = parse_gamepage(await self._get(path), path)
+        self._games_cache[path] = game
+
+        return game
 
     async def game_info_batch(
         self, entries: Iterable[GameEntry]
@@ -240,8 +243,6 @@ class ZopharMusicBrowser:
 
         async with self._cli.get(url, allow_redirects=False) as x:
             assert x.status == 302
-            parent_id, id = x.headers["location"].rsplit("/", 2)[-2:]
+            parent_id, id = URL(x.headers["location"]).raw_parts[-2:]
 
-        return await self.game_info(
-            GameEntry(id=id, parent_id=parent_id, name=id)
-        )
+        return await self.game_info(f"{parent_id}/{id}")

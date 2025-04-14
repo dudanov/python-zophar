@@ -80,7 +80,7 @@ def _item_from_link[T: ChildItem](
     except ParseError:
         return
 
-    if name and len(x := url.parts) == 2:
+    if name and len(x := url.raw_parts) == 2:
         return cls(id=x[1], name=name, parent_id=x[0])
 
 
@@ -177,7 +177,7 @@ def parse_gamelistpage(html: str) -> tuple[list[GameEntry], int]:
     ), _parse_npages(page)
 
 
-def parse_gamepage(html: str, entry: GameEntry | str) -> GameInfo:
+def parse_gamepage(html: str, path: str) -> GameInfo:
     """Gamepage parser"""
 
     page = _html_page_id(html, "gamepage")
@@ -188,11 +188,7 @@ def parse_gamepage(html: str, entry: GameEntry | str) -> GameInfo:
     # id `music_info`: [name, name_alternate, ]
     title = _tag_str(tag := _tag("music_info"), name="h2")
 
-    if isinstance(entry, GameEntry):
-        parent_id, id = entry.parent_id, entry.id
-
-    else:
-        parent_id, _, id = entry.partition("/")
+    parent_id, _, id = path.partition("/")
 
     game = GameInfo(id=id, name=title, parent_id=parent_id)
 
