@@ -243,6 +243,8 @@ class ZopharMusicBrowser:
 
         async with self._cli.get(url, allow_redirects=False) as x:
             assert x.status == 302
-            parent_id, id = URL(x.headers["location"]).raw_parts[-2:]
+            new_location = x.headers["location"]
 
-        return await self.game_info(f"{parent_id}/{id}")
+        path = "/".join(URL(new_location).raw_parts[-2:])
+
+        return await self.game_info(path)
