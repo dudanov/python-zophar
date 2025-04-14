@@ -90,15 +90,7 @@ def parse_mainpage(
     """Main page parser"""
 
     menu_items, blacklisted = {}, True
-    page = BeautifulSoup(html, "lxml")
-    sidebar = _find_tag(page, id="sidebarSearch")
-
-    # available platforms for search engine
-    select = _find_tag(page, name="select")
-    select = {
-        cast(str, x.string): str(x["value"])
-        for x in cast(list[Tag], select("option"))
-    }
+    sidebar = _find_tag(page := BeautifulSoup(html, "lxml"), id="sidebarSearch")
 
     for tag in cast(list[Tag], sidebar(re.compile(r"^[ah]"), string=True)):
         name = cast(str, tag.string)
@@ -108,7 +100,9 @@ def parse_mainpage(
             blacklisted = name in _BLACKLIST
 
             _LOGGER.debug(
-                "Found menu category: '%s', blacklisted: %s.", name, blacklisted
+                "Found top menu entry: '%s', blacklisted: %s.",
+                name,
+                blacklisted,
             )
 
             if not blacklisted:
@@ -117,16 +111,20 @@ def parse_mainpage(
             continue
 
         # Link
-        if blacklisted:
+        if blacklisted or not (id := str(path)).startswith("/music/"):
             continue
 
-        id = str(path).removeprefix("/music").removeprefix("/")
+        id = id[7:]  # remove prefix `/music/`
 
-        _LOGGER.debug("Found menu item: '%s', path: '%s'.", name, id)
+        _LOGGER.debug("Found menu entry: '%s', path: '%s'.", name, id)
 
         menu_items[id] = MenuItem(id=id, name=name, menu=menu)
 
-    return MappingProxyType(menu_items), MappingProxyType(select)
+    # parsing available platforms for search engine
+    select_options = cast(list[Tag], _find_tag(page, name="select")("option"))
+    platforms = {cast(str, x.string): str(x["value"]) for x in select_options}
+
+    return MappingProxyType(menu_items), MappingProxyType(platforms)
 
 
 def _parse_npages(page: Tag) -> int:
@@ -179,7 +177,7 @@ def parse_gamelistpage(html: str) -> tuple[list[GameEntry], int]:
     ), _parse_npages(page)
 
 
-def parse_gamepage(html: str, entry: GameEntry) -> GameInfo:
+def parse_gamepage(html: str, entry: GameEntry | str) -> GameInfo:
     """Gamepage parser"""
 
     page = _html_page_id(html, "gamepage")
@@ -190,7 +188,13 @@ def parse_gamepage(html: str, entry: GameEntry) -> GameInfo:
     # id `music_info`: [name, name_alternate, ]
     title = _tag_str(tag := _tag("music_info"), name="h2")
 
-    game = GameInfo(id=entry.id, name=title, parent_id=entry.parent_id)
+    if isinstance(entry, GameEntry):
+        parent_id, id = entry.parent_id, entry.id
+
+    else:
+        parent_id, _, id = entry.partition("/")
+
+    game = GameInfo(id=id, name=title, parent_id=parent_id)
 
     _LOGGER.debug("Game: %s", title)
 
