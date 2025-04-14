@@ -218,7 +218,10 @@ class ZopharMusicBrowser:
         query, id = {"search": context}, "0"
 
         if platform and (id := self._platforms.get(platform)) is None:
-            raise ValueError("Unknown platform: '%s'", platform)
+            raise ValueError(
+                f"unknown platform '{platform}'.\n"
+                f"Available platforms: {self.platforms}."
+            )
 
         if id != "0":
             query["search_consoleid"] = id
