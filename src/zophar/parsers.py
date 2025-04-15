@@ -31,7 +31,7 @@ class WrongItemError(ParseError):
     """Scraping error exception"""
 
 
-def _find_tag(root: Tag, **kwargs) -> Tag:
+def _get_tag(root: Tag, **kwargs) -> Tag:
     if x := root.find(**kwargs):
         return cast(Tag, x)
 
@@ -39,8 +39,10 @@ def _find_tag(root: Tag, **kwargs) -> Tag:
 
 
 def _html_page_id(html: str, id: str) -> Tag:
+    soup = BeautifulSoup(html, "lxml")
+
     try:
-        return _find_tag(BeautifulSoup(html, "lxml"), id=id)
+        return _get_tag(soup, id=id)
 
     except ParseError:
         raise WrongItemError("This item possibly for another method.")
@@ -51,18 +53,18 @@ def _img_url(root: Tag) -> URL | None:
         return URL(str(img["src"]), encoded=True)
 
 
-def _tag_str(tag: Tag, **kwargs):
+def _get_str(tag: Tag, **kwargs):
     if kwargs:
-        tag = _find_tag(tag, **kwargs)
+        tag = _get_tag(tag, **kwargs)
 
     return " ".join(tag.stripped_strings)
 
 
 def _parse_link(tag: Tag, **kwargs) -> tuple[str, URL]:
-    string = _tag_str(tag)
+    string = _get_str(tag)
 
     if tag.name != "a":
-        tag = _find_tag(tag, name="a", **kwargs)
+        tag = _get_tag(tag, name="a", **kwargs)
 
     url = str(tag["href"]).removeprefix("/music/")
 
@@ -90,7 +92,7 @@ def parse_mainpage(
     """Main page parser"""
 
     menu_items, blacklisted = {}, True
-    sidebar = _find_tag(page := BeautifulSoup(html, "lxml"), id="sidebarSearch")
+    sidebar = _get_tag(page := BeautifulSoup(html, "lxml"), id="sidebarSearch")
 
     for tag in cast(list[Tag], sidebar(re.compile(r"^[ah]"), string=True)):
         name = cast(str, tag.string)
@@ -121,7 +123,7 @@ def parse_mainpage(
         menu_items[id] = MenuItem(id=id, name=name, menu=menu)
 
     # parsing available platforms for search engine
-    select_options = cast(list[Tag], _find_tag(page, name="select")("option"))
+    select_options = cast(list[Tag], _get_tag(page, name="select")("option"))
     platforms = {cast(str, x.string): str(x["value"]) for x in select_options}
 
     return MappingProxyType(menu_items), MappingProxyType(platforms)
@@ -131,7 +133,7 @@ def _parse_npages(page: Tag) -> int:
     """Returns number of available pages"""
 
     try:
-        counter = _tag_str(page, class_="counter")
+        counter = _get_str(page, class_="counter")
 
     except ParseError:
         return 1
@@ -150,7 +152,7 @@ def _parse_gamelist_raw(raw: Tag) -> GameEntry:
     assert any(x.startswith("regularrow") for x in raw["class"])
 
     def _tag(x: str):
-        return _find_tag(raw, class_=x)
+        return _get_tag(raw, class_=x)
 
     # class `name`: (mandatory)
     assert (game := _item_from_link(_tag("name"), cls=GameEntry))
@@ -183,10 +185,10 @@ def parse_gamepage(html: str, path: str) -> GameInfo:
     page = _html_page_id(html, "gamepage")
 
     def _tag(x: str):
-        return _find_tag(page, id=x)
+        return _get_tag(page, id=x)
 
     # id `music_info`: [name, name_alternate, ]
-    title = _tag_str(tag := _tag("music_info"), name="h2")
+    title = _get_str(tag := _tag("music_info"), name="h2")
 
     parent_id, _, id = path.partition("/")
 
@@ -195,9 +197,9 @@ def parse_gamepage(html: str, path: str) -> GameInfo:
     _LOGGER.debug("Game: %s", title)
 
     for tag in cast(list[Tag], tag("p")):
-        data = _find_tag(tag, class_="infodata")
-        data = _item_from_link(data) or _tag_str(data)
-        name = _tag_str(tag, class_="infoname")
+        data = _get_tag(tag, class_="infodata")
+        data = _item_from_link(data) or _get_str(data)
+        name = _get_str(tag, class_="infoname")
 
         _LOGGER.debug("  %s %s", name, data)
 
@@ -226,11 +228,11 @@ def parse_gamepage(html: str, path: str) -> GameInfo:
     game.tracks = (tracks := [])
 
     for tag in cast(list[Tag], _tag("tracklist")("tr")):
-        assert len(tm := _tag_str(tag, class_="length").split(":")) == 2
+        assert len(tm := _get_str(tag, class_="length").split(":")) == 2
 
         tracks.append(
             GameTrack(
-                title=_tag_str(tag, class_="name"),
+                title=_get_str(tag, class_="name"),
                 duration=dt.timedelta(minutes=int(tm[0]), seconds=int(tm[1])),
                 url=_parse_link(tag)[1],
             )
