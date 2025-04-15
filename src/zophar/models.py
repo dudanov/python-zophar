@@ -31,9 +31,9 @@ class GameEntry(Browsable):
 
     cover: URL | None = None
     """URL to cover image"""
-    release_date: str | None = None
+    release_date: Browsable | None = None
     """Release date"""
-    developer: str | None = None
+    developer: Browsable | None = None
     """Developer"""
 
 
@@ -55,9 +55,7 @@ class GameInfo(GameEntry):
 
     console: str
     """Console"""
-    composer: str | None = None
-    """Composer"""
-    publisher: str | None = None
+    publisher: Browsable | None = None
     """Publisher"""
     archives: Mapping[str, URL]
     """Mapping with URLs to music archives by it's type"""

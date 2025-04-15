@@ -167,9 +167,9 @@ def _parse_gamelist_raw(raw: Tag) -> GameEntry:
     # class `image`: (optional)
     game.cover = get_img_src(_tag("image"))
     # class `year`: (optional)
-    game.release_date = get_string(_tag("year"))
+    game.release_date = _item_from_link(_tag("year"))
     # class `developer`: (optional)
-    game.developer = get_string(_tag("developer"))
+    game.developer = _item_from_link(_tag("developer"))
 
     return game
 
@@ -196,39 +196,50 @@ def parse_gamepage(html: str, path: str) -> GameInfo:
     def _tag(x: str):
         return get_tag(page, id=x)
 
-    # id `music_info`: [name, name_alternate, ]
-    args["name"] = get_string(raw := _tag("music_info"), name="h2")
+    # id `music_cover`: [cover]
+    cover = _tag("music_cover")
+    args["cover"] = get_img_src(cover)
 
-    for raw in cast(list[Tag], raw("p")):
-        data = get_string(raw, class_="infodata")
+    # id `music_info`: [name, console, etc.]
+    info = _tag("music_info")
+    args["name"] = get_string(info, name="h2")
+
+    for raw in cast(list[Tag], info("p")):
+        # reading name and make key
         name = get_string(raw, class_="infoname")
         key = name.removesuffix(":").lower().replace(" ", "_")
+
+        # reading data. if data have link make it `Browsable`.
+        tag = get_tag(raw, class_="infodata")
+        data = get_string(tag)
+
+        if a := tag.a:
+            path = str(a["href"]).removeprefix("/music/")
+            data = Browsable(path, data)
+
         args[key] = data
 
-    # id `music_cover`: [cover]
-    args["cover"] = get_img_src(_tag("music_cover"))
-
     # id `mass_download`: [archive]
-    archives = {}
+    download, archives = _tag("mass_download"), {}
 
-    for raw in cast(list[Tag], _tag("mass_download")("a")):
+    for raw in cast(list[Tag], download("a")):
         url = URL(str(raw["href"]), encoded=True)
 
         if not (m := _RE_ARCHIVE.search(url.name)):
-            raise ParseError("Could not get archive type.")
+            raise ParseError("Could not find archive type.")
 
         archives[m.group().lower()] = url
 
     args["archives"] = archives
-    args["tracks"] = (tracks := [])
 
-    for raw in cast(list[Tag], _tag("tracklist")("tr")):
+    # id `tracklist`: [tracks]
+    tracklist, tracks = _tag("tracklist"), []
+
+    for raw in cast(list[Tag], tracklist("tr")):
         title = get_string(raw, class_="name")
 
         m, s = map(int, get_string(raw, class_="length").split(":", 1))
-        duration = dt.timedelta(minutes=m, seconds=s)
-
-        urls = {}
+        duration, urls = dt.timedelta(minutes=m, seconds=s), {}
 
         for a in cast(list[Tag], raw("a")):
             url = URL(str(a["href"]), encoded=True)
@@ -236,6 +247,8 @@ def parse_gamepage(html: str, path: str) -> GameInfo:
             urls[format] = url
 
         tracks.append(GameTrack(title, duration, urls))
+
+    args["tracks"] = tracks
 
     for key in tuple(args):
         if key not in GAMEINFO_FIELDS:
