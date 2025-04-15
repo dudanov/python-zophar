@@ -1,8 +1,10 @@
 import dataclasses as dc
 import datetime as dt
-from typing import Mapping
-from .const import KNOWN_INFOPAGES
+from typing import Literal, Mapping
+
 from yarl import URL
+
+PageType = Literal["infopage", "gamelist", "gamepage"]
 
 
 @dc.dataclass(slots=True)
@@ -13,17 +15,6 @@ class Browsable:
     """Identifier"""
     name: str
     """Name"""
-
-    @property
-    def check(self):
-        if (x := self.path) in KNOWN_INFOPAGES:
-            return "infopage"
-
-        match len(parts := x.split("/")):
-            case 1:
-                
-            
-
 
 
 @dc.dataclass(slots=True)

@@ -3,7 +3,7 @@ from yarl import URL
 BASE_URL = URL("https://www.zophar.net/music/")
 """Base URL"""
 
-KNOWN_INFOPAGES = {
+INFOPAGES = {
     "developer",
     "publisher",
     "year",

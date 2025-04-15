@@ -7,8 +7,8 @@ from typing import AsyncIterator, Iterable
 import aiohttp
 from yarl import URL
 
-from .const import BASE_URL, KNOWN_INFOPAGES
-from .models import Browsable, GameEntry, GameInfo, MenuItem
+from .const import BASE_URL, INFOPAGES
+from .models import Browsable, GameEntry, GameInfo, MenuItem, PageType
 from .parsers import (
     parse_gamelistpage,
     parse_gamepage,
@@ -164,7 +164,7 @@ class ZopharMusicBrowser:
 
         path = item.path
 
-        if path in KNOWN_INFOPAGES:
+        if path in INFOPAGES:
             return parse_infopage(await self._get(path))
 
         raise TypeError("This item not supported.")
@@ -253,3 +253,19 @@ class ZopharMusicBrowser:
         path = "/".join(URL(new_location).parts[-2:])
 
         return await self.game_info(path)
+
+    def _pageclass(self, path: str) -> PageType:
+        if path in INFOPAGES:
+            return "infopage"
+
+        if path in self._main_menu:
+            return "gamelist"
+
+        if len(x := path.split("/")) == 2:
+            if x[0] in INFOPAGES:
+                return "gamelist"
+
+            if x[0] in self._main_menu:
+                return "gamepage"
+
+        raise ValueError("Unable to determine page type by path.")
