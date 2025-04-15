@@ -7,8 +7,8 @@ from typing import AsyncIterator, Iterable
 import aiohttp
 from yarl import URL
 
-from .const import BASE_URL
-from .models import BrowsableItem, ChildItem, GameEntry, GameInfo, MenuItem
+from .const import BASE_URL, KNOWN_INFOPAGES
+from .models import Browsable, GameEntry, GameInfo, MenuItem
 from .parsers import (
     parse_gamelistpage,
     parse_gamepage,
@@ -44,7 +44,7 @@ class ZopharMusicBrowser:
         return self.close()
 
     async def _get(self, url_or_path: URL | str) -> str:
-        url = BASE_URL.join(URL(url_or_path))
+        url = BASE_URL.join(URL(url_or_path, encoded=True))
         async with self._cli.get(url) as x:
             _LOGGER.debug("GET %s", x.url)
             return await x.text()
@@ -79,7 +79,7 @@ class ZopharMusicBrowser:
 
     async def game_list(
         self,
-        item: BrowsableItem,
+        item: Browsable,
         *,
         page: int | None = None,
     ) -> tuple[list[GameEntry], int]:
@@ -100,12 +100,13 @@ class ZopharMusicBrowser:
             url = URL.build(
                 path=url,
                 query_string=f"page={page}",
+                encoded=True,
             )
 
         return parse_gamelistpage(await self._get(url))
 
     async def game_list_generator(
-        self, item: BrowsableItem
+        self, item: Browsable
     ) -> AsyncIterator[list[GameEntry]]:
         """
         Scrapes game lists page by page.
@@ -125,7 +126,7 @@ class ZopharMusicBrowser:
             if npage >= pages:
                 break
 
-    async def game_list_batch(self, item: BrowsableItem) -> list[GameEntry]:
+    async def game_list_batch(self, item: Browsable) -> list[GameEntry]:
         """
         Scrapes all game list.
 
@@ -150,7 +151,7 @@ class ZopharMusicBrowser:
 
         return games
 
-    async def info_page(self, item: BrowsableItem) -> list[ChildItem]:
+    async def info_page(self, item: Browsable) -> list[Browsable]:
         """
         Scrapes info pages (developers, publishers lists).
 
@@ -161,7 +162,12 @@ class ZopharMusicBrowser:
             Items list.
         """
 
-        return parse_infopage(await self._get(item.path))
+        path = item.path
+
+        if path in KNOWN_INFOPAGES:
+            return parse_infopage(await self._get(path))
+
+        raise TypeError("This item not supported.")
 
     async def game_info(self, entry_or_path: GameEntry | str) -> GameInfo:
         """

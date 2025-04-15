@@ -1,27 +1,33 @@
 import dataclasses as dc
 import datetime as dt
-
+from typing import Mapping
+from .const import KNOWN_INFOPAGES
 from yarl import URL
 
 
-@dc.dataclass(slots=True, kw_only=True)
-class BrowsableItem:
+@dc.dataclass(slots=True)
+class Browsable:
     """Browsable entity. Have `path` property."""
 
-    id: str
+    path: str
     """Identifier"""
     name: str
     """Name"""
 
     @property
-    def path(self) -> str:
-        """Relative path to object"""
+    def check(self):
+        if (x := self.path) in KNOWN_INFOPAGES:
+            return "infopage"
 
-        return self.id
+        match len(parts := x.split("/")):
+            case 1:
+                
+            
 
 
-@dc.dataclass(slots=True, kw_only=True)
-class MenuItem(BrowsableItem):
+
+@dc.dataclass(slots=True)
+class MenuItem(Browsable):
     """Menu item"""
 
     menu: str
@@ -29,32 +35,18 @@ class MenuItem(BrowsableItem):
 
 
 @dc.dataclass(slots=True, kw_only=True)
-class ChildItem(BrowsableItem):
-    """Browsable item that have parent"""
-
-    parent_id: str
-    """Parent identifier"""
-
-    @property
-    def path(self) -> str:
-        """Relative path to object"""
-
-        return f"{self.parent_id}/{self.id}"
-
-
-@dc.dataclass(slots=True)
-class GameEntry(ChildItem):
+class GameEntry(Browsable):
     """Game list entry"""
 
     cover: URL | None = None
     """URL to cover image"""
-    release_date: ChildItem | None = None
+    release_date: str | None = None
     """Release date"""
-    developer: ChildItem | None = None
+    developer: str | None = None
     """Developer"""
 
 
-@dc.dataclass(slots=True, kw_only=True)
+@dc.dataclass(slots=True)
 class GameTrack:
     """Game music track"""
 
@@ -62,33 +54,37 @@ class GameTrack:
     """Title"""
     duration: dt.timedelta
     """Duration"""
-    url: URL
-    """URL to MP3 file"""
+    url: Mapping[str, URL]
+    """Mapping with URLs to audio files by it's extension"""
 
 
-@dc.dataclass(slots=True)
+@dc.dataclass(slots=True, kw_only=True)
 class GameInfo(GameEntry):
     """"""
 
-    console: str = dc.field(init=False)
+    console: str
     """Console"""
     composer: str | None = None
     """Composer"""
-    publisher: ChildItem | None = None
+    publisher: str | None = None
     """Publisher"""
-    alternative_name: str | None = None
-    """Alternative name"""
-    ripped_by: str | None = None
-    """Ripped by"""
-    mp3s_by: str | None = None
-    """MP3s by"""
-    tagged_by: str | None = None
-    """Tagged by"""
-    emu_archive: URL | None = None
-    """URL to ZIP with original music files"""
-    mp3_archive: URL | None = None
-    """URL to ZIP with MP3 music files"""
-    flac_archive: URL | None = None
-    """URL to ZIP with FLAC music files"""
-    tracks: list[GameTrack] = dc.field(init=False)
+    archives: Mapping[str, URL]
+    """Mapping with URLs to music archives by it's type"""
+    tracks: list[GameTrack]
     """Soundtrack"""
+
+    def _first_track(self) -> Mapping[str, URL]:
+        if track := next(iter(self.tracks), None):
+            return track.url
+
+        return {}
+
+    def has_format(self, format: str) -> bool:
+        return format in self._first_track()
+
+    @property
+    def formats(self) -> list[str]:
+        return list(self._first_track())
+
+
+GAMEINFO_FIELDS = {x.name for x in dc.fields(GameInfo)}

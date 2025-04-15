@@ -22,12 +22,8 @@ async def main():
         async for x in cli.game_list_generator(nes):
             games = await cli.game_info_batch(x)
 
-            for x in games:
-                for x in x.tracks:
-                    if x.duration > dt.timedelta(seconds=30):
-                        continue
-                    print(x)
-                print()
+            for g in games:
+                print(g)
 
 
 asyncio.run(main())

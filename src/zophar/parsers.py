@@ -4,13 +4,14 @@ import datetime as dt
 import logging
 import re
 from types import MappingProxyType
-from typing import cast
+from typing import Any, cast
 
 from bs4 import BeautifulSoup, Tag
 from yarl import URL
 
 from .models import (
-    ChildItem,
+    GAMEINFO_FIELDS,
+    Browsable,
     GameEntry,
     GameInfo,
     GameTrack,
@@ -21,6 +22,7 @@ _LOGGER = logging.getLogger(__name__)
 
 
 _BLACKLIST = ["Emulated Files"]
+_RE_ARCHIVE = re.compile(r"(?<= \()\w+(?=\)\.zophar\.zip)", re.A)
 
 
 class ParseError(Exception):
@@ -31,59 +33,59 @@ class WrongItemError(ParseError):
     """Scraping error exception"""
 
 
-def _get_tag(root: Tag, **kwargs) -> Tag:
+def get_tag(root: Tag, **kwargs: Any) -> Tag:
     if x := root.find(**kwargs):
         return cast(Tag, x)
 
-    raise ParseError(f"Could not find tag. Params: {kwargs}.")
+    raise ParseError(f"Tag not found. Params: {kwargs}.")
 
 
-def _html_page_id(html: str, id: str) -> Tag:
+def get_tag_from_html(html: str, id: str) -> Tag:
     soup = BeautifulSoup(html, "lxml")
 
     try:
-        return _get_tag(soup, id=id)
+        return get_tag(soup, id=id)
 
     except ParseError:
         raise WrongItemError("This item possibly for another method.")
 
 
-def _img_url(root: Tag) -> URL | None:
+def get_img_src(root: Tag) -> URL | None:
     if img := root.img:
         return URL(str(img["src"]), encoded=True)
 
 
-def _get_str(tag: Tag, **kwargs):
+def get_string(tag: Tag, **kwargs):
     if kwargs:
-        tag = _get_tag(tag, **kwargs)
+        tag = get_tag(tag, **kwargs)
 
     return " ".join(tag.stripped_strings)
 
 
-def _parse_link(tag: Tag, **kwargs) -> tuple[str, URL]:
-    string = _get_str(tag)
+def parse_link(root: Tag, **kwargs) -> tuple[str, URL]:
+    string = get_string(root)
 
-    if tag.name != "a":
-        tag = _get_tag(tag, name="a", **kwargs)
+    if root.name != "a":
+        root = get_tag(root, name="a", **kwargs)
 
-    url = str(tag["href"]).removeprefix("/music/")
+    path = str(root["href"]).removeprefix("/music/")
 
-    return string, URL(url, encoded=True)
+    return string, URL(path, encoded=True)
 
 
-def _item_from_link[T: ChildItem](
-    tag: Tag, *, cls: type[T] = ChildItem
+def _item_from_link[T: Browsable](
+    tag: Tag, *, cls: type[T] = Browsable
 ) -> T | None:
     """Creates Entity instance from tag"""
 
     try:
-        name, url = _parse_link(tag)
+        name, url = parse_link(tag)
 
     except ParseError:
         return
 
-    if name and len(x := url.parts) == 2:
-        return cls(id=x[1], name=name, parent_id=x[0])
+    if name and (path := url.raw_path):
+        return cls(path, name)
 
 
 def parse_mainpage(
@@ -92,7 +94,8 @@ def parse_mainpage(
     """Main page parser"""
 
     menu_items, blacklisted = {}, True
-    sidebar = _get_tag(page := BeautifulSoup(html, "lxml"), id="sidebarSearch")
+    page = BeautifulSoup(html, "lxml")
+    sidebar = get_tag(page, id="sidebarSearch")
 
     for tag in cast(list[Tag], sidebar(re.compile(r"^[ah]"), string=True)):
         name = cast(str, tag.string)
@@ -113,17 +116,22 @@ def parse_mainpage(
             continue
 
         # Link
-        if blacklisted or not (id := str(path)).startswith("/music/"):
+        if blacklisted:
             continue
 
-        id = id[7:]  # remove prefix `/music/`
+        path = str(path)
 
-        _LOGGER.debug("Found menu entry: '%s', path: '%s'.", name, id)
+        if not path.startswith("/music/"):
+            continue
 
-        menu_items[id] = MenuItem(id=id, name=name, menu=menu)
+        path = path[7:]  # remove prefix `/music/`
+
+        _LOGGER.debug("Found menu entry: '%s', path: '%s'.", name, path)
+
+        menu_items[path] = MenuItem(path, name, menu)
 
     # parsing available platforms for search engine
-    select_options = cast(list[Tag], _get_tag(page, name="select")("option"))
+    select_options = cast(list[Tag], get_tag(page, name="select")("option"))
     platforms = {cast(str, x.string): str(x["value"]) for x in select_options}
 
     return MappingProxyType(menu_items), MappingProxyType(platforms)
@@ -133,7 +141,7 @@ def _parse_npages(page: Tag) -> int:
     """Returns number of available pages"""
 
     try:
-        counter = _get_str(page, class_="counter")
+        counter = get_string(page, class_="counter")
 
     except ParseError:
         return 1
@@ -152,16 +160,16 @@ def _parse_gamelist_raw(raw: Tag) -> GameEntry:
     assert any(x.startswith("regularrow") for x in raw["class"])
 
     def _tag(x: str):
-        return _get_tag(raw, class_=x)
+        return get_tag(raw, class_=x)
 
     # class `name`: (mandatory)
     assert (game := _item_from_link(_tag("name"), cls=GameEntry))
     # class `image`: (optional)
-    game.cover = _img_url(_tag("image"))
+    game.cover = get_img_src(_tag("image"))
     # class `year`: (optional)
-    game.release_date = _item_from_link(_tag("year"))
+    game.release_date = get_string(_tag("year"))
     # class `developer`: (optional)
-    game.developer = _item_from_link(_tag("developer"))
+    game.developer = get_string(_tag("developer"))
 
     return game
 
@@ -169,7 +177,7 @@ def _parse_gamelist_raw(raw: Tag) -> GameEntry:
 def parse_gamelistpage(html: str) -> tuple[list[GameEntry], int]:
     """Scrapes list of game entries from `gamelistpage`."""
 
-    page = _html_page_id(html, "gamelistpage")
+    page = get_tag_from_html(html, "gamelistpage")
 
     return list(
         map(
@@ -182,68 +190,64 @@ def parse_gamelistpage(html: str) -> tuple[list[GameEntry], int]:
 def parse_gamepage(html: str, path: str) -> GameInfo:
     """Gamepage parser"""
 
-    page = _html_page_id(html, "gamepage")
+    args: dict[str, Any] = {"path": path}
+    page = get_tag_from_html(html, "gamepage")
 
     def _tag(x: str):
-        return _get_tag(page, id=x)
+        return get_tag(page, id=x)
 
     # id `music_info`: [name, name_alternate, ]
-    title = _get_str(tag := _tag("music_info"), name="h2")
+    args["name"] = get_string(raw := _tag("music_info"), name="h2")
 
-    parent_id, _, id = path.partition("/")
-
-    game = GameInfo(id=id, name=title, parent_id=parent_id)
-
-    _LOGGER.debug("Game: %s", title)
-
-    for tag in cast(list[Tag], tag("p")):
-        data = _get_tag(tag, class_="infodata")
-        data = _item_from_link(data) or _get_str(data)
-        name = _get_str(tag, class_="infoname")
-
-        _LOGGER.debug("  %s %s", name, data)
-
+    for raw in cast(list[Tag], raw("p")):
+        data = get_string(raw, class_="infodata")
+        name = get_string(raw, class_="infoname")
         key = name.removesuffix(":").lower().replace(" ", "_")
-        setattr(game, key, data)
+        args[key] = data
 
     # id `music_cover`: [cover]
-    game.cover = _img_url(_tag("music_cover"))
+    args["cover"] = get_img_src(_tag("music_cover"))
 
-    # id `mass_download`: [mp3_archive, emu_archive]
-    for tag in cast(list[Tag], _tag("mass_download")("a")):
-        desc, url = _parse_link(tag)
+    # id `mass_download`: [archive]
+    archives = {}
 
-        if desc.rfind(" MP3 ") != -1:
-            game.mp3_archive = url
+    for raw in cast(list[Tag], _tag("mass_download")("a")):
+        url = URL(str(raw["href"]), encoded=True)
 
-        elif desc.rfind(" original ") != -1:
-            game.emu_archive = url
+        if not (m := _RE_ARCHIVE.search(url.name)):
+            raise ParseError("Could not get archive type.")
 
-        elif desc.rfind(" FLAC ") != -1:
-            game.flac_archive = url
+        archives[m.group().lower()] = url
 
-        else:
-            _LOGGER.debug("Unknown download link: '%s'.", desc)
+    args["archives"] = archives
+    args["tracks"] = (tracks := [])
 
-    game.tracks = (tracks := [])
+    for raw in cast(list[Tag], _tag("tracklist")("tr")):
+        title = get_string(raw, class_="name")
 
-    for tag in cast(list[Tag], _tag("tracklist")("tr")):
-        assert len(tm := _get_str(tag, class_="length").split(":")) == 2
+        m, s = map(int, get_string(raw, class_="length").split(":", 1))
+        duration = dt.timedelta(minutes=m, seconds=s)
 
-        tracks.append(
-            GameTrack(
-                title=_get_str(tag, class_="name"),
-                duration=dt.timedelta(minutes=int(tm[0]), seconds=int(tm[1])),
-                url=_parse_link(tag)[1],
-            )
-        )
+        urls = {}
 
-    return game
+        for a in cast(list[Tag], raw("a")):
+            url = URL(str(a["href"]), encoded=True)
+            format = url.suffix[1:].lower()
+            urls[format] = url
+
+        tracks.append(GameTrack(title, duration, urls))
+
+    for key in tuple(args):
+        if key not in GAMEINFO_FIELDS:
+            value = args.pop(key)
+            _LOGGER.debug("Field '%s' not exist. Value: '%s'.", key, value)
+
+    return GameInfo(**args)
 
 
-def parse_infopage(html: str) -> list[ChildItem]:
+def parse_infopage(html: str) -> list[Browsable]:
     """Scrapes child items from `infopage`."""
 
-    page = _html_page_id(html, "infopage")
+    page = get_tag_from_html(html, "infopage")
 
     return [x for x in map(_item_from_link, cast(list[Tag], page("a"))) if x]
