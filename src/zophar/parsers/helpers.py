@@ -49,9 +49,8 @@ def parse_link(tag: Tag, **kwargs) -> dict[str, Any]:
         tag = get_tag(tag, name="a", **kwargs)
 
     path = str(tag["href"]).removeprefix("/music/")
-    url = URL(path, encoded=True)
 
-    return {"path": url.raw_path, "name": string}
+    return {"path": path, "name": string}
 
 
 def browsable_from_link(tag: Tag) -> Browsable | None:
