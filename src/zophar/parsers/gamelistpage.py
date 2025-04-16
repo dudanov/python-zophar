@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import cast
+from typing import Iterator, cast
 
 from bs4 import Tag
 
@@ -35,27 +35,31 @@ def _parse_npages(page: Tag) -> int:
     raise ParseError(f"RegExp npages failed. Input: '{counter}'.")
 
 
-def _parse_raw(raw: Tag) -> GameEntry:
-    def _tag(x: str):
-        return get_tag(raw, class_=x)
+def _parse_page(page: Tag) -> Iterator[GameEntry]:
+    raws = page("tr", class_=re.compile("^regularrow"))
 
-    # class `name`: (mandatory)
-    tag = _tag("name")
-    args = parse_link(tag)
+    for raw in cast(list[Tag], raws):
 
-    # class `image`: (optional)
-    tag = _tag("image")
-    args["cover"] = get_img_src(tag)
+        def _tag(x: str):
+            return get_tag(raw, class_=x)
 
-    # class `year`: (optional)
-    tag = _tag("year")
-    args["release_date"] = browsable_from_link(tag)
+        # class `name`: (mandatory)
+        tag = _tag("name")
+        args = parse_link(tag)
 
-    # class `developer`: (optional)
-    tag = _tag("developer")
-    args["developer"] = browsable_from_link(tag)
+        # class `image`: (optional)
+        tag = _tag("image")
+        args["cover"] = get_img_src(tag)
 
-    return GameEntry(**args)
+        # class `year`: (optional)
+        tag = _tag("year")
+        args["release_date"] = browsable_from_link(tag)
+
+        # class `developer`: (optional)
+        tag = _tag("developer")
+        args["developer"] = browsable_from_link(tag)
+
+        yield GameEntry(**args)
 
 
 def parse_gamelistpage(html: str) -> tuple[list[GameEntry], int]:
@@ -63,9 +67,4 @@ def parse_gamelistpage(html: str) -> tuple[list[GameEntry], int]:
 
     page = get_tag_from_html(html, "gamelistpage")
 
-    return list(
-        map(
-            _parse_raw,
-            cast(list[Tag], page("tr", class_=re.compile("^regularrow"))),
-        )
-    ), _parse_npages(page)
+    return list(_parse_page(page)), _parse_npages(page)
