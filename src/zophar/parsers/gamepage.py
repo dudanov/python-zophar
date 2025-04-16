@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import datetime as dt
 import logging
 import re
@@ -99,8 +97,10 @@ def parse_gamepage(html: str, path: str) -> GameInfo:
     args["tracks"] = list(_tracklist(tag))
 
     for key in tuple(args):
-        if key not in GAMEINFO_FIELDS:
-            value = args.pop(key)
-            _LOGGER.debug("Field '%s' not exist. Value: '%s'.", key, value)
+        if key in GAMEINFO_FIELDS:
+            continue
+
+        value = args.pop(key)
+        _LOGGER.debug("Field '%s' not exist. Value: '%s'.", key, value)
 
     return GameInfo(**args)

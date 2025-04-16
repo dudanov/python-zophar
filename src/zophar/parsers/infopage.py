@@ -1,14 +1,9 @@
-from __future__ import annotations
-
-import logging
 from typing import cast
 
 from bs4 import Tag
 
 from ..models import Browsable
 from .helpers import browsable_from_link, get_tag_from_html
-
-_LOGGER = logging.getLogger(__name__)
 
 
 def parse_infopage(html: str) -> list[Browsable]:

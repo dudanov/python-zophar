@@ -1,14 +1,9 @@
-from __future__ import annotations
-
-import logging
 from typing import Any, cast
 
 from bs4 import BeautifulSoup, Tag
 from yarl import URL
 
 from ..models import Browsable
-
-_LOGGER = logging.getLogger(__name__)
 
 
 class ParseError(Exception):
