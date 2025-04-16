@@ -44,27 +44,26 @@ def get_string(tag: Tag, **kwargs):
     return " ".join(tag.stripped_strings)
 
 
-def parse_link(root: Tag, **kwargs) -> tuple[str, URL]:
-    string = get_string(root)
+def parse_link(tag: Tag, **kwargs) -> dict[str, Any]:
+    """Parse link to args for create `Browsable` based objects"""
 
-    if root.name != "a":
-        root = get_tag(root, name="a", **kwargs)
+    if not (string := get_string(tag)):
+        raise ParseError("Tag without name.")
 
-    path = str(root["href"]).removeprefix("/music/")
+    if tag.name != "a":
+        tag = get_tag(tag, name="a", **kwargs)
 
-    return string, URL(path, encoded=True)
+    path = str(tag["href"]).removeprefix("/music/")
+    url = URL(path, encoded=True)
+
+    return {"path": url.raw_path, "name": string}
 
 
-def item_from_link[T: Browsable](
-    tag: Tag, *, cls: type[T] = Browsable
-) -> T | None:
-    """Creates Entity instance from tag"""
+def browsable_from_link(tag: Tag) -> Browsable | None:
+    """Creates `Browsable` from tag"""
 
     try:
-        name, url = parse_link(tag)
+        return Browsable(**parse_link(tag))
 
     except ParseError:
-        return
-
-    if name and (path := url.raw_path):
-        return cls(path, name)
+        pass

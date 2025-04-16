@@ -9,11 +9,12 @@ from bs4 import Tag
 from ..models import GameEntry
 from .helpers import (
     ParseError,
+    browsable_from_link,
     get_img_src,
     get_string,
     get_tag,
     get_tag_from_html,
-    item_from_link,
+    parse_link,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -34,26 +35,27 @@ def _parse_npages(page: Tag) -> int:
     raise ParseError(f"RegExp npages failed. Input: '{counter}'.")
 
 
-def _parse_gamelist_raw(raw: Tag) -> GameEntry:
-    """Scrapes game record from `gamelistpage`."""
-
-    assert raw.name == "tr"
-    # tag class must be `regularrow` or `regularrow_image`
-    assert any(x.startswith("regularrow") for x in raw["class"])
-
+def _parse_raw(raw: Tag) -> GameEntry:
     def _tag(x: str):
         return get_tag(raw, class_=x)
 
     # class `name`: (mandatory)
-    assert (game := item_from_link(_tag("name"), cls=GameEntry))
-    # class `image`: (optional)
-    game.cover = get_img_src(_tag("image"))
-    # class `year`: (optional)
-    game.release_date = item_from_link(_tag("year"))
-    # class `developer`: (optional)
-    game.developer = item_from_link(_tag("developer"))
+    tag = _tag("name")
+    args = parse_link(tag)
 
-    return game
+    # class `image`: (optional)
+    tag = _tag("image")
+    args["cover"] = get_img_src(tag)
+
+    # class `year`: (optional)
+    tag = _tag("year")
+    args["release_date"] = browsable_from_link(tag)
+
+    # class `developer`: (optional)
+    tag = _tag("developer")
+    args["developer"] = browsable_from_link(tag)
+
+    return GameEntry(**args)
 
 
 def parse_gamelistpage(html: str) -> tuple[list[GameEntry], int]:
@@ -63,7 +65,7 @@ def parse_gamelistpage(html: str) -> tuple[list[GameEntry], int]:
 
     return list(
         map(
-            _parse_gamelist_raw,
+            _parse_raw,
             cast(list[Tag], page("tr", class_=re.compile("^regularrow"))),
         )
     ), _parse_npages(page)

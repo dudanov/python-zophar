@@ -6,7 +6,7 @@ from typing import cast
 from bs4 import Tag
 
 from ..models import Browsable
-from .helpers import get_tag_from_html, item_from_link
+from .helpers import browsable_from_link, get_tag_from_html
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -16,4 +16,6 @@ def parse_infopage(html: str) -> list[Browsable]:
 
     page = get_tag_from_html(html, "infopage")
 
-    return [x for x in map(item_from_link, cast(list[Tag], page("a"))) if x]
+    return [
+        x for x in map(browsable_from_link, cast(list[Tag], page("a"))) if x
+    ]
