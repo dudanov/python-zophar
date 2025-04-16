@@ -39,7 +39,7 @@ def get_string(tag: Tag, **kwargs: Any):
     return " ".join(tag.stripped_strings)
 
 
-def parse_link(tag: Tag) -> dict[str, Any]:
+def parse_link(tag: Tag) -> dict[str, str]:
     """Parse link to args for create `Browsable` based objects"""
 
     if not (string := get_string(tag)):
