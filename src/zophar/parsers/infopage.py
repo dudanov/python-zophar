@@ -6,7 +6,7 @@ from typing import cast
 from bs4 import Tag
 
 from ..models import Browsable
-from .parsers import get_tag_from_html, item_from_link
+from .helpers import get_tag_from_html, item_from_link
 
 _LOGGER = logging.getLogger(__name__)
 

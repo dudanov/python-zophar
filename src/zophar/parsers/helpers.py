@@ -15,10 +15,6 @@ class ParseError(Exception):
     """Scraping error exception"""
 
 
-class WrongItemError(ParseError):
-    """Scraping error exception"""
-
-
 def get_tag(root: Tag, **kwargs: Any) -> Tag:
     if x := root.find(**kwargs):
         return cast(Tag, x)
@@ -33,7 +29,7 @@ def get_tag_from_html(html: str, id: str) -> Tag:
         return get_tag(soup, id=id)
 
     except ParseError:
-        raise WrongItemError("This item possibly for another method.")
+        raise ParseError("This item possibly for another method.")
 
 
 def get_img_src(root: Tag) -> URL | None:

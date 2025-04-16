@@ -8,7 +8,7 @@ from typing import cast
 from bs4 import BeautifulSoup, Tag
 
 from ..models import MenuItem
-from .parsers import get_tag
+from .helpers import get_tag
 
 _LOGGER = logging.getLogger(__name__)
 

@@ -7,7 +7,7 @@ from typing import cast
 from bs4 import Tag
 
 from ..models import GameEntry
-from .parsers import (
+from .helpers import (
     ParseError,
     get_img_src,
     get_string,

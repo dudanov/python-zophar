@@ -14,7 +14,7 @@ from ..models import (
     GameInfo,
     GameTrack,
 )
-from .parsers import (
+from .helpers import (
     ParseError,
     get_img_src,
     get_string,
