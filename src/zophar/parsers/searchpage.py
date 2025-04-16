@@ -16,10 +16,10 @@ _LOGGER = logging.getLogger(__name__)
 _BLACKLIST = ["Emulated Files"]
 
 
-def parse_mainpage(
+def parse_searchpage(
     html: str,
 ) -> tuple[MappingProxyType[str, MenuItem], MappingProxyType[str, str]]:
-    """Main page parser"""
+    """Search page parser"""
 
     menu_items, blacklisted = {}, True
     page = BeautifulSoup(html, "lxml")

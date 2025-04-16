@@ -13,7 +13,7 @@ from .parsers import (
     parse_gamelistpage,
     parse_gamepage,
     parse_infopage,
-    parse_mainpage,
+    parse_searchpage,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -51,7 +51,7 @@ class ZopharMusicBrowser:
 
     async def open(self) -> None:
         html = await self._get("search")
-        self._main_menu, self._platforms = parse_mainpage(html)
+        self._main_menu, self._platforms = parse_searchpage(html)
 
     async def close(self):
         """Close"""
