@@ -13,7 +13,7 @@ async def main():
         print(f"Menu items: {cli.menu}\n")
         print(f"Available platforms: {cli.platforms}\n")
 
-        nes = cli.menu_items()[0]
+        nes = cli.menu_name()
         print(f"Getting first menu item: {nes}")
 
         battle = await cli.search("battle", platform="Arcade")
