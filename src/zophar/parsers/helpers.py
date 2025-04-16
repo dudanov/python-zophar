@@ -39,14 +39,14 @@ def get_string(tag: Tag, **kwargs):
     return " ".join(tag.stripped_strings)
 
 
-def parse_link(tag: Tag, **kwargs) -> dict[str, Any]:
+def parse_link(tag: Tag) -> dict[str, Any]:
     """Parse link to args for create `Browsable` based objects"""
 
     if not (string := get_string(tag)):
         raise ParseError("Tag without name.")
 
     if tag.name != "a":
-        tag = get_tag(tag, name="a", **kwargs)
+        tag = get_tag(tag, name="a")
 
     path = str(tag["href"]).removeprefix("/music/")
 
