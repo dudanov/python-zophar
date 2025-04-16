@@ -28,9 +28,15 @@ class Browsable:
     """Browsable entity. Have `path` property."""
 
     path: str
-    """Identifier"""
+    """Request path"""
     name: str
     """Name"""
+
+    @property
+    def id(self) -> str:
+        """Identifier"""
+
+        return self.path.rsplit("/", 1)[-1]
 
 
 @dc.dataclass(slots=True, kw_only=True)
