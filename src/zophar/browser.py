@@ -8,7 +8,7 @@ import aiohttp
 from yarl import URL
 
 from .const import BASE_URL, INFOPAGES
-from .models import Browsable, GameEntry, GameInfo, MenuItem, PageType
+from .models import Browsable, GameEntry, GameInfo, PageType
 from .parsers import (
     parse_gamelistpage,
     parse_gamepage,
@@ -21,7 +21,7 @@ _LOGGER = logging.getLogger(__name__)
 
 class ZopharMusicBrowser:
     _cli: aiohttp.ClientSession
-    _main_menu: MappingProxyType[str, MenuItem]
+    _main_menu: MappingProxyType[str, list[Browsable]]
     _platforms: MappingProxyType[str, str]
     _games_cache: dict[str, GameInfo]
 
@@ -60,18 +60,22 @@ class ZopharMusicBrowser:
             await self._cli.close()
 
     @property
+    def menu(self) -> MappingProxyType[str, list[Browsable]]:
+        """Returns main menu items"""
+
+        return self._main_menu
+
+    @property
     def menu_root(self) -> list[str]:
         """Returns main menu items"""
 
-        return list(dict.fromkeys(x.menu for x in self._main_menu.values()))
+        return list(self._main_menu)
 
-    def menu_items(self, root: str | None = None) -> list[MenuItem]:
-        items = list(self._main_menu.values())
-
+    def menu_items(self, root: str | None = None) -> list[Browsable]:
         if root:
-            return [x for x in items if x.menu == root]
+            return self._main_menu[root]
 
-        return items
+        return list(it.chain.from_iterable(self._main_menu.values()))
 
     @property
     def platforms(self) -> list[str]:

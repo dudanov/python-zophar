@@ -17,14 +17,6 @@ class Browsable:
     """Name"""
 
 
-@dc.dataclass(slots=True)
-class MenuItem(Browsable):
-    """Menu item"""
-
-    menu: str
-    """Menu top item"""
-
-
 @dc.dataclass(slots=True, kw_only=True)
 class GameEntry(Browsable):
     """Game list entry"""

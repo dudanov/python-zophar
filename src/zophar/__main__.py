@@ -10,10 +10,10 @@ logging.basicConfig(level=logging.DEBUG)
 async def main():
     async with ZopharMusicBrowser() as cli:
         print(f"Menu root:  {cli.menu_root}\n")
-        print(f"Menu items: {cli.menu_items}\n")
+        print(f"Menu items: {cli.menu}\n")
         print(f"Available platforms: {cli.platforms}\n")
 
-        nes = cli.menu_items[0]
+        nes = cli.menu_items()[0]
         print(f"Getting first menu item: {nes}")
 
         battle = await cli.search("battle", platform="Arcade")

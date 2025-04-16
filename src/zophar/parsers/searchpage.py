@@ -5,7 +5,7 @@ from typing import cast
 
 from bs4 import BeautifulSoup, Tag
 
-from ..models import MenuItem
+from ..models import Browsable
 from .helpers import get_tag
 
 _LOGGER = logging.getLogger(__name__)
@@ -16,11 +16,11 @@ _BLACKLIST = ["Emulated Files"]
 
 def parse_searchpage(
     html: str,
-) -> tuple[MappingProxyType[str, MenuItem], MappingProxyType[str, str]]:
+) -> tuple[MappingProxyType[str, list[Browsable]], MappingProxyType[str, str]]:
     """Search page parser"""
 
-    menu_items, blacklisted = {}, True
-    page = BeautifulSoup(html, "lxml")
+    menu_items: dict[str, list[Browsable]] = {}
+    page, blacklisted = BeautifulSoup(html, "lxml"), True
     sidebar = get_tag(page, id="sidebarSearch")
 
     for tag in cast(list[Tag], sidebar(re.compile(r"^[ah]"), string=True)):
@@ -54,7 +54,7 @@ def parse_searchpage(
 
         _LOGGER.debug("Found menu entry: '%s', path: '%s'.", name, path)
 
-        menu_items[path] = MenuItem(path, name, menu)
+        menu_items.setdefault(menu, []).append(Browsable(path, name))
 
     # parsing available platforms for search engine
     select_options = cast(list[Tag], get_tag(page, name="select")("option"))
