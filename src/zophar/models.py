@@ -33,10 +33,11 @@ class Browsable:
     """Name"""
 
     @property
-    def id(self) -> str:
-        """Identifier"""
+    def parts(self) -> tuple[str, str]:
+        """Parts of the path: parent and identifier"""
 
-        return self.path.rsplit("/", 1)[-1]
+        parent, _, id = self.path.rpartition("/")
+        return parent, id
 
 
 @dc.dataclass(slots=True, kw_only=True)
