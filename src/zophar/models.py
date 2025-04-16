@@ -43,7 +43,7 @@ class GameTrack:
 
     title: str
     """Title"""
-    duration: dt.timedelta
+    length: dt.timedelta
     """Duration"""
     url: Mapping[str, URL]
     """Mapping with URLs to audio files by it's extension"""
