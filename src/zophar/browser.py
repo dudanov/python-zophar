@@ -1,6 +1,7 @@
 import asyncio
 import itertools as it
 import logging
+from collections import ChainMap
 from types import MappingProxyType
 from typing import AsyncIterator, Iterable
 
@@ -8,7 +9,15 @@ import aiohttp
 from yarl import URL
 
 from .const import BASE_URL, INFOPAGES
-from .models import Browsable, GameEntry, GameInfo, PageType
+from .models import (
+    Browsable,
+    GameEntry,
+    GameInfo,
+    Menu,
+    MenuItems,
+    PageType,
+    Platforms,
+)
 from .parsers import (
     parse_gamelistpage,
     parse_gamepage,
@@ -21,9 +30,10 @@ _LOGGER = logging.getLogger(__name__)
 
 class ZopharMusicBrowser:
     _cli: aiohttp.ClientSession
-    _main_menu: MappingProxyType[str, list[Browsable]]
-    _platforms: MappingProxyType[str, str]
     _games_cache: dict[str, GameInfo]
+    _main_menu: Menu
+    _menu_items: MenuItems
+    _platforms: Platforms
 
     def __init__(
         self,
@@ -32,9 +42,9 @@ class ZopharMusicBrowser:
     ) -> None:
         self._cli = session or aiohttp.ClientSession()
         self._close_connector = not session
-        self._main_menu = MappingProxyType({})
-        self._platforms = MappingProxyType({})
         self._games_cache = {}
+        self._main_menu = {}
+        self._platforms = {}
 
     async def __aenter__(self):
         await self.open()
@@ -52,6 +62,9 @@ class ZopharMusicBrowser:
     async def open(self) -> None:
         html = await self._get("search")
         self._main_menu, self._platforms = parse_searchpage(html)
+        self._menu_items = MappingProxyType(
+            ChainMap(*self._main_menu.values())  # type: ignore
+        )
 
     async def close(self):
         """Close"""
@@ -60,22 +73,21 @@ class ZopharMusicBrowser:
             await self._cli.close()
 
     @property
-    def menu(self) -> MappingProxyType[str, list[Browsable]]:
-        """Returns main menu items"""
-
-        return self._main_menu
-
-    @property
     def menu_root(self) -> list[str]:
-        """Returns main menu items"""
+        """Returns root menu titles"""
 
         return list(self._main_menu)
 
-    def menu_items(self, root: str | None = None) -> list[Browsable]:
-        if root:
-            return self._main_menu[root]
+    def menu_name(self, path: str):
+        """Returns menu item name by path"""
 
-        return list(it.chain.from_iterable(self._main_menu.values()))
+        return self._menu_items[path]
+
+    @property
+    def menu(self) -> Menu:
+        """Returns main menu items"""
+
+        return self._main_menu
 
     @property
     def platforms(self) -> list[str]:
@@ -264,14 +276,14 @@ class ZopharMusicBrowser:
         if path in INFOPAGES:
             return "infopage"
 
-        if path in self._main_menu:
+        if path in self._menu_items:
             return "gamelist"
 
         if len(x := path.split("/")) == 2:
             if x[0] in INFOPAGES:
                 return "gamelist"
 
-            if x[0] in self._main_menu:
+            if x[0] in self._menu_items:
                 return "gamepage"
 
         raise ValueError("Unable to determine page type by path.")
