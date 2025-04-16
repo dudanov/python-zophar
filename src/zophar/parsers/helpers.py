@@ -12,14 +12,14 @@ _LOGGER = logging.getLogger(__name__)
 
 
 class ParseError(Exception):
-    """Scraping error exception"""
+    """Parsing error exception"""
 
 
 def get_tag(root: Tag, **kwargs: Any) -> Tag:
     if x := root.find(**kwargs):
         return cast(Tag, x)
 
-    raise ParseError(f"Tag not found. Params: {kwargs}.")
+    raise ParseError(f"Tag not found. Search params: {kwargs}.")
 
 
 def get_tag_from_html(html: str, id: str) -> Tag:
@@ -29,7 +29,7 @@ def get_tag_from_html(html: str, id: str) -> Tag:
         return get_tag(soup, id=id)
 
     except ParseError:
-        raise ParseError("This item possibly for another method.")
+        raise ParseError("This page for another parsing method.")
 
 
 def get_img_src(root: Tag) -> URL | None:
