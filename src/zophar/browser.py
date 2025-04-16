@@ -250,7 +250,7 @@ class ZopharMusicBrowser:
             assert x.status == 302
             new_location = x.headers["location"]
 
-        path = "/".join(URL(new_location).parts[-2:])
+        path = "/".join(URL(new_location).raw_parts[-2:])
 
         return await self.game_info(path)
 
