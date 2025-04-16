@@ -65,11 +65,13 @@ class ZopharMusicBrowser:
 
         return list(dict.fromkeys(x.menu for x in self._main_menu.values()))
 
-    @property
-    def menu_items(self) -> list[MenuItem]:
-        """Returns music categories"""
+    def menu_items(self, root: str | None = None) -> list[MenuItem]:
+        items = list(self._main_menu.values())
 
-        return list(self._main_menu.values())
+        if root:
+            return [x for x in items if x.menu == root]
+
+        return items
 
     @property
     def platforms(self) -> list[str]:
