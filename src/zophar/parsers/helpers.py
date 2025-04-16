@@ -32,7 +32,7 @@ def get_img_src(root: Tag) -> URL | None:
         return URL(str(img["src"]), encoded=True)
 
 
-def get_string(tag: Tag, **kwargs):
+def get_string(tag: Tag, **kwargs: Any):
     if kwargs:
         tag = get_tag(tag, **kwargs)
 
