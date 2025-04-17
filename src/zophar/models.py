@@ -41,11 +41,21 @@ class Folder:
     children: dict[str, Folder] = dc.field(default_factory=dict)
     """Children"""
 
+    @property
+    def parts(self) -> tuple[str, str]:
+        """Parts of the path: parent and identifier"""
+
+        parent, _, id = self.path.rpartition("/")
+        return parent, id
+
     def resolve(self, path: str) -> Folder:
         """"""
 
         if not path:
             return self
+
+        if path.startswith("/"):
+            return self.resolve(path[1:])
 
         id, _, path = path.partition("/")
 
@@ -54,20 +64,11 @@ class Folder:
 
         raise KeyError("")
 
-    def add(self, path: str, item: str | Folder) -> str:
+    def add(self, parent: str, item: Folder) -> str:
         """"""
 
-        parent, _, id = path.rpartition("/")
-
-        if isinstance(item, str):
-            name = item
-            item = Folder(path, name)
-
-        else:
-            name = item.name
-
-        if not id:
-            id = slugify(name)
+        if not (id := item.parts[1]):
+            id = slugify(item.name)
 
         self.resolve(parent).children[id] = item
 
