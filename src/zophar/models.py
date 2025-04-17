@@ -61,7 +61,7 @@ class Folder:
 
         if isinstance(item, str):
             name = item
-            item = Folder(path, item)
+            item = Folder(path, name)
 
         else:
             name = item.name
