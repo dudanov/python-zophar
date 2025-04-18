@@ -31,51 +31,6 @@ class GameTrack:
 
 
 @dc.dataclass(slots=True)
-class Folder:
-    """Browsable entity. Have `path` property."""
-
-    path: str
-    """URL relative path"""
-    name: str
-    """Name"""
-    children: dict[str, Folder] = dc.field(default_factory=dict)
-    """Children"""
-
-    @property
-    def parts(self) -> tuple[str, str]:
-        """Parts of the path: parent and identifier"""
-
-        parent, _, id = self.path.rpartition("/")
-        return parent, id
-
-    def resolve(self, path: str) -> Folder:
-        """"""
-
-        if not path:
-            return self
-
-        if path.startswith("/"):
-            return self.resolve(path[1:])
-
-        id, _, path = path.partition("/")
-
-        if x := self.children.get(id):
-            return x.resolve(path)
-
-        raise KeyError("")
-
-    def add(self, parent: str, item: Folder) -> str:
-        """"""
-
-        if not (id := item.parts[1]):
-            id = slugify(item.name)
-
-        self.resolve(parent).children[id] = item
-
-        return id
-
-
-@dc.dataclass(slots=True)
 class Browsable:
     """Browsable entity. Have `path` property."""
 
@@ -90,6 +45,47 @@ class Browsable:
 
         parent, _, id = self.path.rpartition("/")
         return parent, id
+
+
+@dc.dataclass(slots=True)
+class Folder(Browsable):
+    """Browsable entity. Have `path` property."""
+
+    children: dict[str, Folder] = dc.field(default_factory=dict)
+    """Children"""
+
+    @property
+    def id(self):
+        """"""
+
+        return self.path.rsplit("/", 1)[-1]
+
+    def get(self, path: str) -> Folder:
+        """"""
+
+        if not path:
+            return self
+
+        if path.startswith("/"):
+            raise KeyError("Absolute paths not supported")
+
+        id, _, path = path.partition("/")
+
+        if x := self.children.get(id):
+            return x.get(path)
+
+        raise KeyError("Could not get child")
+
+    def add(self, path: str, *items: Folder) -> None:
+        """"""
+
+        children = self.get(path).children
+
+        for x in items:
+            if not (id := x.id):
+                id = slugify(x.name)
+
+            children[id] = x
 
 
 @dc.dataclass(slots=True, kw_only=True)
