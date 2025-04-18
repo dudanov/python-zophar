@@ -76,16 +76,14 @@ class Folder(Browsable):
 
         raise KeyError("Could not get child")
 
-    def add(self, path: str, *items: Folder) -> None:
+    def add(self, *items: Folder) -> None:
         """"""
-
-        children = self.get(path).children
 
         for x in items:
             if not (id := x.id):
                 id = slugify(x.name)
 
-            children[id] = x
+            self.children[id] = x
 
 
 @dc.dataclass(slots=True, kw_only=True)
