@@ -1,29 +1,25 @@
 import asyncio
 import itertools as it
 import logging
-from collections import ChainMap
-from types import MappingProxyType
-from typing import AsyncIterator, Iterable
+from typing import AsyncIterator, Iterable, Literal
 
 import aiohttp
 from yarl import URL
 
 from .const import BASE_URL, INFOPAGES
-from .models import (
-    Browsable,
+from .parsers import (
+    Container,
     GameEntry,
     GameInfo,
-    Menu,
-    MenuItems,
-    PageType,
     Platforms,
-)
-from .parsers import (
     parse_gamelistpage,
     parse_gamepage,
     parse_infopage,
     parse_searchpage,
 )
+
+type PageType = Literal["infopage", "gamelist", "gamepage"]
+
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -31,8 +27,7 @@ _LOGGER = logging.getLogger(__name__)
 class ZopharMusicBrowser:
     _cli: aiohttp.ClientSession
     _games_cache: dict[str, GameInfo]
-    _main_menu: Menu
-    _menu_items: MenuItems
+    _main_menu: Container
     _platforms: Platforms
 
     def __init__(
@@ -43,7 +38,6 @@ class ZopharMusicBrowser:
         self._cli = session or aiohttp.ClientSession()
         self._close_connector = not session
         self._games_cache = {}
-        self._main_menu = {}
         self._platforms = {}
 
     async def __aenter__(self):
@@ -62,9 +56,6 @@ class ZopharMusicBrowser:
     async def open(self) -> None:
         html = await self._get("search")
         self._main_menu, self._platforms = parse_searchpage(html)
-        self._menu_items = MappingProxyType(
-            ChainMap(*self._main_menu.values())  # type: ignore
-        )
 
     async def close(self):
         """Close"""
@@ -76,15 +67,10 @@ class ZopharMusicBrowser:
     def menu_root(self) -> list[str]:
         """Returns root menu titles"""
 
-        return list(self._main_menu)
-
-    def menu_name(self, path: str):
-        """Returns menu item name by path"""
-
-        return self._menu_items[path]
+        return list(x.name for x in self._main_menu.children.values())
 
     @property
-    def menu(self) -> Menu:
+    def menu(self) -> Container:
         """Returns main menu items"""
 
         return self._main_menu
@@ -97,7 +83,7 @@ class ZopharMusicBrowser:
 
     async def game_list(
         self,
-        item: Browsable,
+        item: Container,
         *,
         page: int | None = None,
     ) -> tuple[list[GameEntry], int]:
@@ -124,7 +110,7 @@ class ZopharMusicBrowser:
         return parse_gamelistpage(await self._get(url))
 
     async def game_list_generator(
-        self, item: Browsable
+        self, item: Container
     ) -> AsyncIterator[list[GameEntry]]:
         """
         Scrapes game lists page by page.
@@ -144,7 +130,7 @@ class ZopharMusicBrowser:
             if npage >= pages:
                 break
 
-    async def game_list_batch(self, item: Browsable) -> list[GameEntry]:
+    async def game_list_batch(self, item: Container) -> list[GameEntry]:
         """
         Scrapes all game list.
 
@@ -169,7 +155,7 @@ class ZopharMusicBrowser:
 
         return games
 
-    async def info_page(self, item: Browsable) -> list[Browsable]:
+    async def info_page(self, item: Container) -> list[Container]:
         """
         Scrapes info pages (developers, publishers lists).
 
@@ -204,7 +190,7 @@ class ZopharMusicBrowser:
         if game := self._games_cache.get(path := entry_or_path):
             return game
 
-        game = parse_gamepage(await self._get(path), path)
+        game = parse_gamepage(await self._get(path))
         self._games_cache[path] = game
 
         return game

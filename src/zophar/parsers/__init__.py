@@ -2,7 +2,8 @@ from .gamelistpage import parse_gamelistpage
 from .gamepage import parse_gamepage
 from .helpers import ParseError
 from .infopage import parse_infopage
-from .searchpage import parse_searchpage
+from .models import Browsable, Container, GameEntry, GameInfo, GameTrack
+from .searchpage import Platforms, parse_searchpage
 
 __all__ = [
     "parse_gamelistpage",
@@ -10,4 +11,10 @@ __all__ = [
     "parse_infopage",
     "parse_searchpage",
     "ParseError",
+    "Browsable",
+    "Container",
+    "GameEntry",
+    "GameInfo",
+    "GameTrack",
+    "Platforms",
 ]

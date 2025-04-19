@@ -4,7 +4,6 @@ from typing import Iterator, cast
 
 from bs4 import Tag
 
-from ..models import GameEntry
 from .helpers import (
     ParseError,
     browsable_from_link,
@@ -14,6 +13,7 @@ from .helpers import (
     get_tag_from_html,
     parse_link,
 )
+from .models import GameEntry
 
 _LOGGER = logging.getLogger(__name__)
 

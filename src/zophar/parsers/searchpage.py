@@ -1,12 +1,14 @@
 import logging
 import re
 from types import MappingProxyType
-from typing import cast
+from typing import Mapping, cast
 
 from bs4 import BeautifulSoup, Tag
 
-from ..models import Folder, Menu, Platforms
 from .helpers import get_tag
+from .models import Container
+
+type Platforms = Mapping[str, str]
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -14,10 +16,10 @@ _LOGGER = logging.getLogger(__name__)
 _BLACKLIST = ["Emulated Files"]
 
 
-def parse_searchpage(html: str) -> tuple[Menu, Platforms]:
+def parse_searchpage(html: str) -> tuple[Container, Platforms]:
     """Search page parser"""
 
-    menu = Folder("", "")
+    menu = Container("", "")
     page, blacklisted = BeautifulSoup(html, "lxml"), True
     sidebar = get_tag(page, id="sidebarSearch")
 
@@ -35,7 +37,7 @@ def parse_searchpage(html: str) -> tuple[Menu, Platforms]:
             )
 
             if not blacklisted:
-                menu.add(folder := Folder("", name))
+                menu.add(folder := Container("", name))
 
             continue
 
@@ -52,10 +54,10 @@ def parse_searchpage(html: str) -> tuple[Menu, Platforms]:
 
         _LOGGER.debug("Found menu entry: '%s', path: '%s'.", name, path)
 
-        folder.add(Folder(path, name))
+        folder.add(Container(path, name))
 
     # parsing available platforms for search engine
     select_options = cast(list[Tag], get_tag(page, name="select")("option"))
     platforms = {cast(str, x.string): str(x["value"]) for x in select_options}
 
-    return MappingProxyType(menu), MappingProxyType(platforms)
+    return menu, MappingProxyType(platforms)

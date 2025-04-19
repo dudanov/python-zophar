@@ -3,7 +3,7 @@ from typing import Any, cast
 from bs4 import BeautifulSoup, Tag
 from yarl import URL
 
-from ..models import Browsable
+from .models import Container
 
 
 class ParseError(Exception):
@@ -53,11 +53,11 @@ def parse_link(tag: Tag) -> dict[str, Any]:
     return {"path": path, "name": string}
 
 
-def browsable_from_link(tag: Tag) -> Browsable | None:
+def browsable_from_link(tag: Tag) -> Container | None:
     """Creates `Browsable` from tag"""
 
     try:
-        return Browsable(**parse_link(tag))
+        return Container(**parse_link(tag))
 
     except ParseError:
         pass

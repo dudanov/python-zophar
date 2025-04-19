@@ -2,32 +2,10 @@ from __future__ import annotations
 
 import dataclasses as dc
 import datetime as dt
-from typing import Literal, Mapping
+from typing import Mapping
 
 from slugify import slugify
 from yarl import URL
-
-type PageType = Literal["infopage", "gamelist", "gamepage"]
-
-type MenuItems = Mapping[str, Folder]
-"""Menu items: path - name"""
-
-type Menu = Mapping[str, MenuItems]
-"""Menu: `Root name` - `Menu item`"""
-
-type Platforms = Mapping[str, str]
-
-
-@dc.dataclass(slots=True)
-class GameTrack:
-    """Game music track"""
-
-    title: str
-    """Title"""
-    length: dt.timedelta
-    """Duration"""
-    url: Mapping[str, URL]
-    """Mapping with URLs to audio files by it's extension"""
 
 
 @dc.dataclass(slots=True)
@@ -46,21 +24,34 @@ class Browsable:
         parent, _, id = self.path.rpartition("/")
         return parent, id
 
-
-@dc.dataclass(slots=True)
-class Folder(Browsable):
-    """Browsable entity. Have `path` property."""
-
-    children: dict[str, Folder] = dc.field(default_factory=dict)
-    """Children"""
-
     @property
     def id(self):
         """"""
 
         return self.path.rsplit("/", 1)[-1]
 
-    def get(self, path: str) -> Folder:
+    def get(self, path: str) -> Browsable:
+        """"""
+
+        if path:
+            raise TypeError("Not supported")
+
+        return self
+
+    def add(self, *items: Browsable) -> None:
+        """Adds new child"""
+
+        raise TypeError("Not supported")
+
+
+@dc.dataclass(slots=True)
+class Container(Browsable):
+    """Browsable entity. Have `path` property."""
+
+    children: dict[str, Browsable] = dc.field(default_factory=dict)
+    """Children"""
+
+    def get(self, path: str) -> Browsable:
         """"""
 
         if not path:
@@ -76,8 +67,8 @@ class Folder(Browsable):
 
         raise KeyError("Could not get child")
 
-    def add(self, *items: Folder) -> None:
-        """"""
+    def add(self, *items: Browsable) -> None:
+        """Adds new child"""
 
         for x in items:
             if not (id := x.id):
@@ -98,10 +89,30 @@ class GameEntry(Browsable):
     """Developer"""
 
 
+@dc.dataclass(slots=True)
+class GameTrack:
+    """Game music track"""
+
+    title: str
+    """Title"""
+    length: dt.timedelta
+    """Duration"""
+    url: Mapping[str, URL]
+    """Mapping with URLs to audio files by it's extension"""
+
+
 @dc.dataclass(slots=True, kw_only=True)
-class GameInfo(GameEntry):
+class GameInfo:
     """"""
 
+    name: str
+    """Name"""
+    cover: URL | None = None
+    """URL to cover image"""
+    release_date: Browsable | None = None
+    """Release date"""
+    developer: Browsable | None = None
+    """Developer"""
     console: str
     """Console"""
     publisher: Browsable | None = None

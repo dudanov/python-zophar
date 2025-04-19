@@ -6,18 +6,18 @@ from typing import Any, Iterator, cast
 from bs4 import Tag
 from yarl import URL
 
-from ..models import (
-    GAMEINFO_FIELDS,
-    Browsable,
-    GameInfo,
-    GameTrack,
-)
 from .helpers import (
     ParseError,
     get_img_src,
     get_string,
     get_tag,
     get_tag_from_html,
+)
+from .models import (
+    GAMEINFO_FIELDS,
+    Browsable,
+    GameInfo,
+    GameTrack,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -71,10 +71,10 @@ def _music_info(info: Tag) -> Iterator[tuple[str, Any]]:
         yield key, data
 
 
-def parse_gamepage(html: str, path: str) -> GameInfo:
+def parse_gamepage(html: str) -> GameInfo:
     """Gamepage parser"""
 
-    args: dict[str, Any] = {"path": path}
+    args: dict[str, Any] = {}
     page = get_tag_from_html(html, "gamepage")
 
     def _tag(x: str):
