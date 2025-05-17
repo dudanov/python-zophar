@@ -1,14 +1,14 @@
 import asyncio
 import logging
 
-from .browser import MusicBrowser
+from .browser import ZopharBrowser
 from .parsers import ParseError
 
 logging.basicConfig(level=logging.DEBUG)
 
 
 async def main():
-    async with MusicBrowser() as cli:
+    async with ZopharBrowser() as cli:
         print(f"Available platforms: {cli.consoles}\n")
         print(f"Menu: {cli.menu}\n")
 

@@ -1,4 +1,4 @@
-from .browser import MusicBrowser
+from .browser import ZopharBrowser
 from .parsers import AudioFormat, GameListPage, GamePage, InfoPage, ParseError
 
 __all__ = [
@@ -6,6 +6,6 @@ __all__ = [
     "GameListPage",
     "GamePage",
     "InfoPage",
-    "MusicBrowser",
     "ParseError",
+    "ZopharBrowser",
 ]

@@ -41,7 +41,7 @@ def _make_url(link: PageLink, page: int | None = None) -> URL:
     return _BASE_URL.join(link)
 
 
-class MusicBrowser:
+class ZopharBrowser:
     """Zophar's Game Music browser"""
 
     _cli: aiohttp.ClientSession
@@ -80,7 +80,7 @@ class MusicBrowser:
         hardware platforms.
         """
 
-        url = _BASE_URL.joinpath("search")
+        url = _make_url("search")
 
         async with self._cli.get(url) as x:
             html = await x.text()
