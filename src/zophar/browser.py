@@ -80,7 +80,7 @@ class MusicBrowser:
         hardware platforms.
         """
 
-        url = _BASE_URL.joinpath("search")
+        url = _BASE_URL.joinpath("search", encoded=True)
 
         async with self._cli.get(url) as x:
             html = await x.text()
