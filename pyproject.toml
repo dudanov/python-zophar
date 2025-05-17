@@ -1,6 +1,6 @@
 [project]
 name = "zophar"
-version = "1.0.0"
+version = "1.0.1"
 description = "Asynchronous Python music browser of the Zophar domain."
 authors = [
   { name = "Sergey Dudanov", email = "sergey.dudanov@gmail.com" },
