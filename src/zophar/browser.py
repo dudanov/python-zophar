@@ -41,7 +41,7 @@ def _make_url(link: PageLink, page: int | None = None) -> URL:
     return _BASE_URL.join(link)
 
 
-class MusicBrowser:
+class ZopharBrowser:
     """Zophar's Game Music browser"""
 
     _cli: aiohttp.ClientSession
