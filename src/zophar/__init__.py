@@ -1,8 +1,11 @@
-from .browser import ZopharMusicBrowser
-from .parsers import ParseError, WrongItemError
+from .browser import MusicBrowser
+from .parsers import AudioFormat, GameListPage, GamePage, InfoPage, ParseError
 
 __all__ = [
+    "AudioFormat",
+    "GameListPage",
+    "GamePage",
+    "InfoPage",
+    "MusicBrowser",
     "ParseError",
-    "WrongItemError",
-    "ZopharMusicBrowser",
 ]
