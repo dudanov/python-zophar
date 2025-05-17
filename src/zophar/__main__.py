@@ -1,33 +1,27 @@
 import asyncio
-import datetime as dt
 import logging
 
-from .browser import ZopharMusicBrowser
+from .browser import MusicBrowser
+from .parsers import ParseError
 
 logging.basicConfig(level=logging.DEBUG)
 
 
 async def main():
-    async with ZopharMusicBrowser() as cli:
-        print(f"Menu root:  {cli.menu_root}\n")
-        print(f"Menu items: {cli.menu_items}\n")
-        print(f"Available platforms: {cli.platforms}\n")
+    async with MusicBrowser() as cli:
+        print(f"Available platforms: {cli.consoles}\n")
+        print(f"Menu: {cli.menu}\n")
 
-        nes = cli.menu_items[0]
-        print(f"Getting first menu item: {nes}")
+        while link := input(
+            "Enter URL (absolute or relative) or empty to exit: "
+        ):
+            try:
+                result = await cli.page(link)
 
-        battle = await cli.search("battle", platform="Arcade")
-        print(battle)
+            except ParseError as e:
+                result = f"Error occured: {e}"
 
-        async for x in cli.game_list_generator(nes):
-            games = await cli.game_info_batch(x)
-
-            for x in games:
-                for x in x.tracks:
-                    if x.duration > dt.timedelta(seconds=30):
-                        continue
-                    print(x)
-                print()
+            print(f"\n{result}\n")
 
 
 asyncio.run(main())

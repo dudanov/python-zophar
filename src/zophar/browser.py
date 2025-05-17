@@ -1,29 +1,54 @@
 import asyncio
 import itertools as it
-import logging
-from types import MappingProxyType
-from typing import AsyncIterator, Iterable
+from typing import AsyncIterator, Final, Iterable, overload
 
 import aiohttp
 from yarl import URL
 
-from .const import BASE_URL
-from .models import BrowsableItem, ChildItem, GameEntry, GameInfo, MenuItem
 from .parsers import (
-    parse_gamelistpage,
-    parse_gamepage,
-    parse_infopage,
-    parse_mainpage,
+    Browsable,
+    Consoles,
+    GameEntry,
+    GameListPage,
+    GamePage,
+    InfoPage,
+    Menu,
+    PagesSupported,
+    ParseError,
+    parse_page,
+    parse_searchpage,
 )
 
-_LOGGER = logging.getLogger(__name__)
+type PageLink = Browsable | URL | str
+"""Supported page link types"""
+
+_BASE_URL: Final = URL("https://www.zophar.net/music/", encoded=True)
+
+_RANDOM_PATH: Final = "/random-music"
 
 
-class ZopharMusicBrowser:
+def _make_url(link: PageLink, page: int | None = None) -> URL:
+    if isinstance(link, Browsable):
+        link = URL(link.path, encoded=True)
+
+    elif isinstance(link, str):
+        link = URL(link)
+
+    if page:
+        query = {"page": page} if page > 1 else None
+        link = link.with_query(query)
+
+    return _BASE_URL.join(link)
+
+
+class MusicBrowser:
+    """Zophar's Game Music browser"""
+
     _cli: aiohttp.ClientSession
-    _main_menu: MappingProxyType[str, MenuItem]
-    _platforms: MappingProxyType[str, str]
-    _games_cache: dict[str, GameInfo]
+    _close_connector: bool
+    _menu: Menu
+    _consoles: Consoles
+    _cache: dict[str, PagesSupported]
 
     def __init__(
         self,
@@ -31,181 +56,244 @@ class ZopharMusicBrowser:
         session: aiohttp.ClientSession | None = None,
     ) -> None:
         self._cli = session or aiohttp.ClientSession()
-        self._close_connector = not session
-        self._main_menu = MappingProxyType({})
-        self._platforms = MappingProxyType({})
-        self._games_cache = {}
+        self._close_connector = session is None
+        self._menu = {}
+        self._consoles = {}
+        self._cache = {}
 
     async def __aenter__(self):
-        await self.open()
+        try:
+            await self.open()
+
+        except aiohttp.ClientError:
+            await self.close()
+            raise
+
         return self
 
-    def __aexit__(self, exc_type, exc_value, traceback):
-        return self.close()
-
-    async def _get(self, url_or_path: URL | str) -> str:
-        url = BASE_URL.join(URL(url_or_path))
-        async with self._cli.get(url) as x:
-            _LOGGER.debug("GET %s", x.url)
-            return await x.text()
+    async def __aexit__(self, exc_type, exc_value, traceback):
+        await self.close()
 
     async def open(self) -> None:
-        html = await self._get("search")
-        self._main_menu, self._platforms = parse_mainpage(html)
+        """
+        Makes initial read of main menu struct and available
+        hardware platforms.
+        """
+
+        url = _BASE_URL.joinpath("search")
+
+        async with self._cli.get(url) as x:
+            html = await x.text()
+
+        self._menu, self._consoles = parse_searchpage(html)
 
     async def close(self):
-        """Close"""
+        """Closes HTTPS client session"""
 
         if self._close_connector:
             await self._cli.close()
 
     @property
-    def menu_root(self) -> list[str]:
-        """Returns main menu items"""
+    def menu(self) -> Menu:
+        """Main menu. Tree walking starting from here."""
 
-        return list(dict.fromkeys(x.menu for x in self._main_menu.values()))
-
-    @property
-    def menu_items(self) -> list[MenuItem]:
-        """Returns music categories"""
-
-        return list(self._main_menu.values())
+        return self._menu
 
     @property
-    def platforms(self) -> list[str]:
-        """Returns available hardware platforms"""
+    def consoles(self) -> list[str]:
+        """Available consoles (hardware platforms). Used for searching."""
 
-        return list(self._platforms)
+        return list(self._consoles)
 
-    async def game_list(
+    @overload
+    async def page(
         self,
-        item: BrowsableItem,
-        *,
-        page: int | None = None,
-    ) -> tuple[list[GameEntry], int]:
+        link: None = None,
+    ) -> GamePage:
         """
-        Scrapes game list pages.
-
-        Args:
-            item: Browsable item.
-            page: Page number. First page is `default`.
+        Returns random game page.
 
         Returns:
-            Tuple of game entries list and number of available pages.
+            Instance of random `GamePage`.
         """
 
-        url = item.path
+    @overload
+    async def page(
+        self,
+        link: PageLink,
+        *,
+        npage: int | None = None,
+    ) -> PagesSupported:
+        """
+        Generic parser of all supported pages.
 
-        if page and page > 1:
-            url = URL.build(
-                path=url,
-                query_string=f"page={page}",
-            )
+        Args:
+            link: Any of supported link types.
+            npage: Page number (used for game lists only). Default is first page.
 
-        return parse_gamelistpage(await self._get(url))
+        Returns:
+            Instance of page entity.
+        """
 
-    async def game_list_generator(
-        self, item: BrowsableItem
-    ) -> AsyncIterator[list[GameEntry]]:
+    async def page(
+        self,
+        link: PageLink | None = None,
+        *,
+        npage: int | None = None,
+    ) -> PagesSupported:
+        url = _make_url(link or _RANDOM_PATH, npage)
+
+        if url.raw_path == _RANDOM_PATH:
+            # URL is random game page, gets new URL to use caching.
+            async with self._cli.get(url, allow_redirects=False) as x:
+                if x.status != 302:
+                    raise ParseError(
+                        "Could not get random game. No redirection from server."
+                    )
+
+                location = x.headers["location"]
+
+            url = URL(location).with_scheme("https")
+
+        if page := self._cache.get(path_qs := url.path_qs):
+            return page
+
+        async with self._cli.get(url, allow_redirects=False) as x:
+            if x.status != 200:
+                raise ParseError("Page not found.")
+
+            html = await x.text()
+
+        self._cache[path_qs] = page = parse_page(html)
+
+        return page
+
+    async def gamelist_page(
+        self,
+        link: PageLink,
+        *,
+        npage: int | None = None,
+    ) -> GameListPage:
+        """
+        Gets and parses the specified game list page.
+
+        Args:
+            link: Any supported page link type.
+            npage: Page number. The default is the first page.
+
+        Returns:
+            Instance of the game list page entity `GameListPage`.
+        """
+
+        page = await self.page(link, npage=npage)
+        assert isinstance(page, GameListPage)
+
+        return page
+
+    async def gamelist_iter(
+        self,
+        link: PageLink,
+    ) -> AsyncIterator[GameListPage]:
         """
         Scrapes game lists page by page.
 
         Args:
-            item: Browsable item.
+            link: Any of supported link types.
 
         Returns:
-            Lists of game entries.
+            Instances of `GameListPage`.
         """
 
-        for npage in it.count(1):
-            games, pages = await self.game_list(item, page=npage)
+        for n in it.count(1):
+            yield (x := await self.gamelist_page(link, npage=n))
 
-            yield games
-
-            if npage >= pages:
+            if x.page >= x.total_pages:
                 break
 
-    async def game_list_batch(self, item: BrowsableItem) -> list[GameEntry]:
+    async def gamelist(self, link: PageLink) -> list[GameEntry]:
         """
         Scrapes all game list.
 
         Args:
-            item: Browsable item.
+            link: Any of supported link types.
 
         Returns:
             Game entries list.
         """
 
-        games, pages = await self.game_list(item)
+        page = await self.gamelist_page(link, npage=1)
 
-        if pages < 2:
-            return games
+        if (total := page.total_pages) < 2:
+            return page.entries
 
-        result = await asyncio.gather(
-            *(self.game_list(item, page=x) for x in range(2, pages + 1))
-        )
+        async with asyncio.TaskGroup() as tg:
+            tasks = [
+                tg.create_task(self.gamelist_page(link, npage=n))
+                for n in range(2, total + 1)
+            ]
 
-        for x, _ in result:
-            games.extend(x)
+        for x in tasks:
+            page.entries.extend(x.result().entries)
 
-        return games
+        return page.entries
 
-    async def info_page(self, item: BrowsableItem) -> list[ChildItem]:
+    async def infopage(self, link: PageLink) -> InfoPage:
         """
         Scrapes info pages (developers, publishers lists).
 
         Args:
-            item: Browsable item.
+            link: Any of supported link types.
 
         Returns:
             Items list.
         """
 
-        return parse_infopage(await self._get(item.path))
+        page = await self.page(link)
+        assert isinstance(page, InfoPage)
 
-    async def game_info(self, entry_or_path: GameEntry | str) -> GameInfo:
+        return page
+
+    async def gamepage(self, link: PageLink | None = None) -> GamePage:
         """
-        Scrapes game page.
+        Returns game page.
 
         Args:
-            entry: Game entry from game list or relative path.
+            link: Any of supported link types. Default: random game page.
 
         Returns:
-            Full game information with soundtracks.
+            Instance of `GamePage`.
         """
 
-        if isinstance(entry_or_path, GameEntry):
-            entry_or_path = entry_or_path.path
+        page = await self.page(link)
+        assert isinstance(page, GamePage)
 
-        if game := self._games_cache.get(path := entry_or_path):
-            return game
+        return page
 
-        game = parse_gamepage(await self._get(path), path)
-        self._games_cache[path] = game
-
-        return game
-
-    async def game_info_batch(
-        self, entries: Iterable[GameEntry]
-    ) -> list[GameInfo]:
+    async def gamepages(
+        self,
+        links: Iterable[PageLink | None],
+    ) -> list[GamePage]:
         """
         Scrapes games pages.
 
         Args:
-            entry: Game entry from games list.
+            links: Iterable of any supported link types.
 
         Returns:
-            Full game information with soundtracks.
+            List of `GamePage` instances.
         """
 
-        return await asyncio.gather(*map(self.game_info, entries))
+        async with asyncio.TaskGroup() as tg:
+            tasks = [tg.create_task(self.gamepage(x)) for x in links]
+
+        return [x.result() for x in tasks]
 
     async def search(
         self,
         context: str,
         *,
-        platform: str | None = None,
-    ) -> list[GameEntry]:
+        console: str | None = None,
+    ) -> GameListPage:
         """
         Search games by context and optionally filtered by platform ID.
 
@@ -214,36 +302,20 @@ class ZopharMusicBrowser:
             platform: Filter by hardware platform (default: All).
 
         Returns:
-            Game entries list.
+            Instance of `GameListPage`.
         """
 
         query, id = {"search": context}, "0"
 
-        if platform and (id := self._platforms.get(platform)) is None:
-            raise ValueError(
-                f"unknown platform '{platform}'.\n"
-                f"Available platforms: {self.platforms}."
-            )
+        if console and (id := self._consoles.get(console)) is None:
+            raise ValueError(f"Unknown console '{console}'.")
 
         if id != "0":
             query["search_consoleid"] = id
 
-        url = URL.build(path="search", query=query)
+        link = URL.build(path="search", query=query)
 
-        result, pages = parse_gamelistpage(await self._get(url))
-        assert pages == 1
+        page = await self.gamelist_page(link)
+        assert page.total_pages == 1
 
-        return result
-
-    async def random_game(self) -> GameInfo:
-        """Gets random game"""
-
-        url = BASE_URL.with_path("random-music")
-
-        async with self._cli.get(url, allow_redirects=False) as x:
-            assert x.status == 302
-            new_location = x.headers["location"]
-
-        path = "/".join(URL(new_location).parts[-2:])
-
-        return await self.game_info(path)
+        return page
